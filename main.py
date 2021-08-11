@@ -1,43 +1,49 @@
 import sys
 
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QTabWidget, \
+from PyQt5.QtWidgets import QApplication, QWidget, QTabWidget, \
     QGridLayout
 
 from Layouts.dice_layout import DiceLayout
+from Layouts.player_layout import PlayerLayout
 
 
 class ApplicationWindow(QtWidgets.QWidget):
     def __init__(self):
-        super(ApplicationWindow, self).__init__()
+        super().__init__()
         self.layout = QGridLayout()
 
-        self.dice_layout = DiceLayout()
         tabwidget = QTabWidget()
-        label2 = QLabel("Widget in Tab 2.")
         tabwidget.addTab(self.dice_tab(), "Dice")
-        tabwidget.addTab(label2, "Manage Players")
+        tabwidget.addTab(self.manage_players_tab(), "Manage Players")
         self.layout.addWidget(tabwidget, 0, 0)
         self.setLayout(self.layout)
 
-    def dice_tab(self):
+    @staticmethod
+    def dice_tab():
         """Create the General page UI."""
         dice_tab = QWidget()
         layout = DiceLayout()
-        self.dice_layout = layout
         dice_tab.setLayout(layout)
         return dice_tab
 
-    def manage_players_tab(self):
-        pass
+    @staticmethod
+    def manage_players_tab():
+        dice_tab = QWidget()
+        layout = PlayerLayout()
+        dice_tab.setLayout(layout)
+        return dice_tab
 
 
 def main():
     app = QApplication([])
     window = ApplicationWindow()
     window.show()
-    app.exec()
-
+    try:
+        app.exec()
+    except BaseException as error:
+        print(error)
+        raise error
 
 if __name__ == "__main__":
     sys.exit(main())

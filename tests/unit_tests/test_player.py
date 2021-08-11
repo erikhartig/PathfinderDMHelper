@@ -5,6 +5,7 @@ from tests.unit_tests.test_dice_roll import all_values_in_results, values_in_bou
 def test_create_player():
     player = create_player()
     assert player.ability_scores.strength() == 10
+    assert player.name == "my_name"
 
 
 def test_roll_strength():
@@ -36,7 +37,7 @@ def test_roll_strength_bounds():
 
 def create_player():
     ability_scores = create_ability_scores()
-    return Player(ability_scores)
+    return Player("my_name", ability_scores)
 
 
 def create_ability_scores():

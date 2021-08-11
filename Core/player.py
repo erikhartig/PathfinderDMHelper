@@ -36,4 +36,5 @@ class AbilityScores:
 
 @dataclass
 class Player:
+    name: str
     ability_scores: AbilityScores
