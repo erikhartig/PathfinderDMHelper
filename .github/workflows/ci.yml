@@ -25,14 +25,8 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: |
-          pip install -r requirements.txt
-          PYTHONPATH=. py.test tests/unit_tests
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+      - name: Install requirements
+        run: pip install -r requirements.txt
+        
+      - name: Run unit tests
+        run: PYTHONPATH=. py.test tests/unit_tests
