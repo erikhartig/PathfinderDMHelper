@@ -29,7 +29,7 @@ jobs:
       - name: Run a one-line script
         run: |
           pip install -r requirements.txt
-          pytest tests/unit_tests
+          PYTHONPATH=. py.test tests/unit_tests
 
       # Runs a set of commands using the runners shell
       - name: Run a multi-line script
