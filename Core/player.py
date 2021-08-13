@@ -1,6 +1,7 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import floor
 
+from Core.link import PlayerItemLink
 from Core.roll_dice import roll_d20
 
 
@@ -75,3 +76,23 @@ class Player:
     name: str
     ability_scores: AbilityScores
     skills: Skills
+    _items: [PlayerItemLink] = field(default_factory=list)
+
+    def assign_item(self, item):
+        link = PlayerItemLink(self, item)
+        self._items.append(link)
+        item._player = link
+
+    def remove_item(self, item):
+        for item_links in self._items:
+            if item_links.item == item:
+                item_links.item._player = None
+                self._items.remove(item_links)
+                return
+
+    @property
+    def items(self):
+        items = []
+        for item_links in self._items:
+            items.append(item_links.item)
+        return items

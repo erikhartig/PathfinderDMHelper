@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from Core.link import PlayerItemLink
+
 
 @dataclass
 class Item:
@@ -10,4 +12,10 @@ class Item:
     effect: str
     item_level: int
     gp_cost: int
-    # def __init__(self, name, description, activate, frequency, effect, item_level, gp_cost):
+    _player: PlayerItemLink = None
+
+    @property
+    def player(self):
+        if self._player:
+            return self._player.player
+        return None

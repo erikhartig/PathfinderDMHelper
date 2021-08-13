@@ -1,26 +1,23 @@
 import atexit
-import pickle
+import math
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QLabel, QPushButton, QVBoxLayout, QFormLayout, QDialogButtonBox, QLineEdit, \
-    QGroupBox, QDialog, QGridLayout, QTabWidget, QWidget
+from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtWidgets import QLabel, QPushButton, QFormLayout, QGridLayout, QTabWidget, QWidget
 
 from Core.item import Item
-from paths import ITEMS
+from Core.manage_data import load_items, save_items
+from CustomObjects.lines import VLine
+from Layouts.popup import Popup, get_field_names, create_qlines
 
 
 class ItemLayout(QGridLayout):
-    def __init__(self):
+    def __init__(self, data_store):
         super().__init__()
-        self.items = self.load_items()
+        self.data_store = data_store
+        self.data_store.items = load_items()
         self.tabwidget = self.create_item_tabs()
-        self.addWidget(self.tabwidget, 1, 1, 4, 4)
-
-        title = QLabel("Items")
-        title.setFont(QFont('Arial', 20))
-        title.setAlignment(Qt.AlignCenter)
-        self.addWidget(title, 0, 1)
+        self.setRowStretch(1, 10)
         self._add_create_item()
         self._add_edit_item()
         self._add_delete_item()
@@ -29,21 +26,31 @@ class ItemLayout(QGridLayout):
     def create_item_tabs(self):
         tabwidget = QTabWidget()
         tabwidget.setStyleSheet("""QTabBar::tab:selected{ background: DarkCyan }""")
-        for item in self.items:
+        for item in self.data_store.items:
             tabwidget.addTab(self.item_tab(item), item.name)
-        self.addWidget(tabwidget, 1, 1, 4, 4)
+        tabwidget.setMaximumHeight(700)
+        self.addWidget(tabwidget, 1, 1, 4, 1, alignment=Qt.AlignTop)
         return tabwidget
 
     @staticmethod
     def item_tab(item):
         item_tab = QWidget()
         layout = QGridLayout()
+        layout.setVerticalSpacing(10)
+        layout.setColumnStretch(2, 4)
+        layout.addWidget(VLine(color=QColor("White")), 0, 1, len(vars(item)) - 1, 1)
+        grid_num = 0
+        for item_field in vars(item):
+            if item_field in ["name", "_player"]:
+                continue
+            stat_value = getattr(item, item_field)
+            stat_label = stat_layout_style(clean_field_name(item_field))
+            layout.addWidget(stat_label, grid_num, 0)
 
-        stat_label = stat_header_style("Ability Scores")
-        layout.addWidget(stat_label, 0, 0)
-        grid_num = 1
-        for ability in vars(item.ability_scores):
-            pass
+            value_label = stat_layout_style(stat_value)
+            layout.addWidget(value_label, grid_num, 2)
+            layout.setRowStretch(grid_num, 2 + math.ceil(math.log(len(stat_value))))
+            grid_num += 1
 
         item_tab.setLayout(layout)
         return item_tab
@@ -67,12 +74,12 @@ class ItemLayout(QGridLayout):
         self.addWidget(button, 3, 0, 1, 1)
 
     def delete_item(self):
-        del self.items[self.tabwidget.currentIndex()]
+        del self.data_store.items[self.tabwidget.currentIndex()]
         self._update_item_tabs()
 
     def edit_item(self):
         index = self.tabwidget.currentIndex()
-        item = self.items[index]
+        item = self.data_store.items[index]
         popup = EditItemPopup(self, item, index)
         popup.show()
         popup.exec()
@@ -84,74 +91,40 @@ class ItemLayout(QGridLayout):
         popup.exec()
 
     def add_item(self, item):
-        self.items.append(item)
-        print(self.items)
+        self.data_store.items.append(item)
         self._update_item_tabs()
 
     def _update_item_tabs(self):
         self.tabwidget.close()
         self.tabwidget = self.create_item_tabs()
-        self.addWidget(self.tabwidget, 1, 1, 4, 4)
 
     def save_items(self):
-        with open(ITEMS, 'wb') as item_file:
-            pickle.dump(self.items, item_file, pickle.HIGHEST_PROTOCOL)
-
-    @staticmethod
-    def load_items():
-        if not ITEMS.exists():
-            return []
-        with open(ITEMS, 'rb') as item_file:
-            items = pickle.load(item_file)
-        return items
+        save_items(self.data_store.items)
 
 
-class ItemCreationPopup(QDialog):
+class ItemCreationPopup(Popup):
     def __init__(self, parent):
         """
         Args:
             parent (itemLayout):
         """
-        super().__init__()
-        self.setWindowTitle("Create item")
-        self.item = None
-        self.setGeometry(100, 100, 300, 400)
-        self.form_group_box = QGroupBox("")
-        self.parent = parent
-        # creating a line edit
-        self.name_line_edit = QLineEdit()
-        # calling the method that create the form
-        self.create_form()
-
-        # creating a dialog button for ok and cancel
-        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        self.button_box.accepted.connect(self.get_info)
-        self.button_box.rejected.connect(self.reject)
-
-        # creating a vertical layout
-        main_layout = QVBoxLayout()
-        main_layout.addWidget(self.form_group_box)
-        main_layout.addWidget(self.button_box)
-
-        # setting lay out
-        self.setLayout(main_layout)
+        self.item_fields = get_field_names(Item)
+        self.item_fields.remove("_player")
+        self.item_line_edits = create_qlines(self.item_fields)
+        super().__init__("Create Item", parent)
 
     def get_info(self):
-        # printing the form information
-        print("Person Name : {0}".format(self.name_line_edit.text()))
-        item = Item(self.name_line_edit.text(), self._get_ability_scores(), self._get_skills())
-        # closing the window
+        item = Item(*self._get_item_values())
         self.parent.add_item(item)
         self.close()
 
+    def _get_item_values(self):
+        return [item.text() for item in self.item_line_edits.values()]
 
     def create_form(self):
         layout = QFormLayout()
-        layout.addRow(QLabel("Name"), self.name_line_edit)
-        for ability in self.abilities:
-            layout.addRow(QLabel(ability.capitalize()), self.ability_line_edits[ability])
-        for skill in self.skills:
-            layout.addRow(QLabel(skill.capitalize()), self.skill_line_edits[skill])
+        for item_field in self.item_fields:
+            layout.addRow(QLabel(clean_field_name(item_field)), self.item_line_edits[item_field])
         self.form_group_box.setLayout(layout)
 
 
@@ -160,20 +133,19 @@ class EditItemPopup(ItemCreationPopup):
         super().__init__(parent)
         self.item = item
         self.index = index
-        self.name_line_edit.setText(item.name)
-        for name, line_edit in self.ability_line_edits.items():
-            line_edit.setText(str(getattr(item.ability_scores, name)()))
-        for name, line_edit in self.skill_line_edits.items():
-            line_edit.setText(str(getattr(item.skills, name)()))
+        for name, line_edit in self.item_line_edits.items():
+            line_edit.setText(str(getattr(item, name)))
 
     def get_info(self):
-        self.parent.items[self.index].ability_scores = self._get_ability_scores()
+        self.parent.items[self.index] = Item(*self._get_item_values())
         self.close()
 
 
 def stat_layout_style(value):
     label = QLabel(str(value))
     label.setFont(QFont('Arial', 13))
+    label.setAlignment(Qt.AlignTop)
+    label.setWordWrap(True)
     label.show()
     return label
 
@@ -190,3 +162,8 @@ def stat_header_style(value):
 def button_manage_item_style(button):
     button.setMinimumWidth(150)
     return button
+
+
+def clean_field_name(value):
+    value = value.replace("_", " ")
+    return value.title()

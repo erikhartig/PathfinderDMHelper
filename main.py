@@ -4,6 +4,7 @@ from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QTabWidget, \
     QGridLayout
 
+from Core.manage_data import DataStore
 from Layouts.dice_layout import DiceLayout
 from Layouts.item_layout import ItemLayout
 from Layouts.player_layout import PlayerLayout
@@ -13,6 +14,7 @@ class ApplicationWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.layout = QGridLayout()
+        self.data_store = DataStore()
 
         tabwidget = QTabWidget()
         tabwidget.addTab(self.dice_tab(), "Dice")
@@ -29,17 +31,15 @@ class ApplicationWindow(QtWidgets.QWidget):
         dice_tab.setLayout(layout)
         return dice_tab
 
-    @staticmethod
-    def manage_players_tab():
+    def manage_players_tab(self):
         manage_players_tab = QWidget()
-        layout = PlayerLayout()
+        layout = PlayerLayout(self.data_store)
         manage_players_tab.setLayout(layout)
         return manage_players_tab
 
-    @staticmethod
-    def manage_items_tab():
+    def manage_items_tab(self):
         manage_items_tab = QWidget()
-        layout = ItemLayout()
+        layout = ItemLayout(self.data_store)
         manage_items_tab.setLayout(layout)
         return manage_items_tab
 

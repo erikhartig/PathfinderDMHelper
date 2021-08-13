@@ -1,38 +1,33 @@
 import atexit
-import pickle
-from dataclasses import fields
 
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QLabel, QPushButton, QVBoxLayout, QFormLayout, QDialogButtonBox, QLineEdit, \
-    QGroupBox, QDialog, QGridLayout, QTabWidget, QWidget
+from PyQt5.QtWidgets import QLabel, QPushButton, QFormLayout, QLineEdit, \
+    QGridLayout, QTabWidget, QWidget, QListWidget
 
+from Core.manage_data import save_players, load_players
 from Core.player import Player, AbilityScores, AbilityScore, Skills, SkillScore
-from paths import PLAYERS
+from Layouts.popup import Popup, get_field_names, create_qlines
 
 
 class PlayerLayout(QGridLayout):
-    def __init__(self):
+    def __init__(self, data_store):
         super().__init__()
-        self.players = self.load_players()
+        self.data_store = data_store
+        self.data_store.players = load_players()
         self.tabwidget = self.create_player_tabs()
-        self.addWidget(self.tabwidget, 1, 1, 4, 4)
 
-        title = QLabel("Players")
-        title.setFont(QFont('Arial', 20))
-        title.setAlignment(Qt.AlignCenter)
-        self.addWidget(title, 0, 1)
         self._add_create_player()
         self._add_edit_player()
         self._add_delete_player()
+        self._add_item()
         atexit.register(self.save_players)
 
     def create_player_tabs(self):
         tabwidget = QTabWidget()
         tabwidget.setStyleSheet("""QTabBar::tab:selected{ background: DarkCyan }""")
-        for player in self.players:
+        for player in self.data_store.players:
             tabwidget.addTab(self.player_tab(player), player.name)
-        self.addWidget(tabwidget, 1, 1, 4, 4)
+        self.addWidget(tabwidget, 1, 1, 5, 4)
         return tabwidget
 
     @staticmethod
@@ -85,13 +80,26 @@ class PlayerLayout(QGridLayout):
         button.show()
         self.addWidget(button, 3, 0, 1, 1)
 
+    def _add_item(self):
+        button = button_manage_player_style(QPushButton('Add Item'))
+        button.clicked.connect(self.add_item)
+        button.show()
+        self.addWidget(button, 4, 0, 1, 1)
+
+    def add_item(self):
+        index = self.tabwidget.currentIndex()
+        player = self.data_store.players[index]
+        popup = AddItemPopup(self, player, self.data_store.items)
+        popup.show()
+        popup.exec()
+
     def delete_player(self):
-        del self.players[self.tabwidget.currentIndex()]
+        del self.data_store.players[self.tabwidget.currentIndex()]
         self._update_player_tabs()
 
     def edit_player(self):
         index = self.tabwidget.currentIndex()
-        player = self.players[index]
+        player = self.data_store.players[index]
         popup = EditPlayerPopup(self, player, index)
         popup.show()
         popup.exec()
@@ -103,74 +111,34 @@ class PlayerLayout(QGridLayout):
         popup.exec()
 
     def add_player(self, player):
-        self.players.append(player)
-        print(self.players)
+        self.data_store.players.append(player)
+        print(self.data_store.players)
         self._update_player_tabs()
 
     def _update_player_tabs(self):
         self.tabwidget.close()
         self.tabwidget = self.create_player_tabs()
-        self.addWidget(self.tabwidget, 1, 1, 4, 4)
 
     def save_players(self):
-        with open(PLAYERS, 'wb') as player_file:
-            pickle.dump(self.players, player_file, pickle.HIGHEST_PROTOCOL)
-
-    @staticmethod
-    def load_players():
-        if not PLAYERS.exists():
-            return []
-        with open(PLAYERS, 'rb') as player_file:
-            players = pickle.load(player_file)
-        return players
+        save_players(self.data_store.players)
 
 
-class PlayerCreationPopup(QDialog):
+class PlayerCreationPopup(Popup):
     def __init__(self, parent):
         """
         Args:
             parent (PlayerLayout):
         """
-        super().__init__()
-        self.setWindowTitle("Create Player")
-        self.player = None
-        self.setGeometry(100, 100, 300, 400)
-        self.form_group_box = QGroupBox("")
-        self.parent = parent
-        # creating a line edit
         self.name_line_edit = QLineEdit()
-        self.ability_line_edits = {}
-        self.abilities = [field.name for field in fields(AbilityScores)]
-        for attribute in self.abilities:
-            self.ability_line_edits[attribute] = QLineEdit()
-            print(attribute)
+        self.abilities = get_field_names(AbilityScores)
+        self.ability_line_edits = create_qlines(self.abilities)
 
-        self.skill_line_edits = {}
-        self.skills = [field.name for field in fields(Skills)]
-        for skill in self.skills:
-            self.skill_line_edits[skill] = QLineEdit()
-            print(skill)
-        # calling the method that create the form
-        self.create_form()
-
-        # creating a dialog button for ok and cancel
-        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        self.button_box.accepted.connect(self.get_info)
-        self.button_box.rejected.connect(self.reject)
-
-        # creating a vertical layout
-        main_layout = QVBoxLayout()
-        main_layout.addWidget(self.form_group_box)
-        main_layout.addWidget(self.button_box)
-
-        # setting lay out
-        self.setLayout(main_layout)
+        self.skills = get_field_names(Skills)
+        self.skill_line_edits = create_qlines(self.skills)
+        super().__init__("Create Player", parent)
 
     def get_info(self):
-        # printing the form information
-        print("Person Name : {0}".format(self.name_line_edit.text()))
         player = Player(self.name_line_edit.text(), self._get_ability_scores(), self._get_skills())
-        # closing the window
         self.parent.add_player(player)
         self.close()
 
@@ -190,6 +158,39 @@ class PlayerCreationPopup(QDialog):
         for skill in self.skills:
             layout.addRow(QLabel(skill.capitalize()), self.skill_line_edits[skill])
         self.form_group_box.setLayout(layout)
+
+
+class AddItemPopup(Popup):
+    def __init__(self, parent, player, items):
+        """
+        Args:
+            parent (PlayerLayout):
+        """
+        self.player = player
+        self.items = items
+        super().__init__("Add Item", parent)
+        self.selected_item = None
+
+    def get_info(self):
+        if self.selected_item:
+            self.player.assign_item(self.selected_item)
+        self.close()
+
+    def create_form(self):
+        layout = QGridLayout()
+        list_widget = QListWidget()
+        list_widget.itemClicked.connect(self.add_item)
+        for item in self.items:
+            if not item.player:
+                list_widget.addItem(item.name)
+        layout.addWidget(list_widget, 0, 0)
+        self.form_group_box.setLayout(layout)
+
+    def add_item(self, item_selected):
+        for item in self.items:
+            if item.name == item_selected.text():
+                self.selected_item = item
+            return
 
 
 class EditPlayerPopup(PlayerCreationPopup):
