@@ -1,35 +1,37 @@
-import atexit
 import math
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QColor
-from PyQt5.QtWidgets import QLabel, QPushButton, QFormLayout, QGridLayout, QTabWidget, QWidget
+from PyQt5.QtCore import Qt, QStringListModel
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QLabel, QFormLayout, QGridLayout, QTabWidget, QWidget, QCompleter, QLineEdit
 
-from Core.item import Item
-from Core.manage_data import load_items, save_items
+from Core.player import Item, get_all_items
+from Core.scrape import get_item_names, request_item_data
 from CustomObjects.lines import VLine
+from Layouts.edit_grid_layout import stat_layout_style, EditGridLayout
 from Layouts.popup import Popup, get_field_names, create_qlines
 
 
-class ItemLayout(QGridLayout):
-    def __init__(self, data_store):
+class ItemLayout(EditGridLayout):
+    def __init__(self):
         super().__init__()
-        self.data_store = data_store
-        self.data_store.items = load_items()
+        self.items = get_all_items()
         self.tabwidget = self.create_item_tabs()
         self.setRowStretch(1, 10)
-        self._add_create_item()
-        self._add_edit_item()
-        self._add_delete_item()
-        atexit.register(self.save_items)
+        menu_buttons = {
+            "Create New Item": self.open_item_creation,
+            "Import Item": self.import_item,
+            "Edit Item": self.edit_item,
+            "Delete Item": self.delete_item,
+        }
+        self._create_menu_buttons(menu_buttons)
 
     def create_item_tabs(self):
         tabwidget = QTabWidget()
         tabwidget.setStyleSheet("""QTabBar::tab:selected{ background: DarkCyan }""")
-        for item in self.data_store.items:
+        for item in self.items:
             tabwidget.addTab(self.item_tab(item), item.name)
         tabwidget.setMaximumHeight(700)
-        self.addWidget(tabwidget, 1, 1, 4, 1, alignment=Qt.AlignTop)
+        self.addWidget(tabwidget, 1, 1, 5, 1, alignment=Qt.AlignTop)
         return tabwidget
 
     @staticmethod
@@ -38,48 +40,34 @@ class ItemLayout(QGridLayout):
         layout = QGridLayout()
         layout.setVerticalSpacing(10)
         layout.setColumnStretch(2, 4)
-        layout.addWidget(VLine(color=QColor("White")), 0, 1, len(vars(item)) - 1, 1)
+        fields = [field for field in vars(item) if getattr(item, field) and field not in ["name", "_player"]]
+        layout.addWidget(VLine(color=QColor("White")), 0, 1, len(fields), 1)
         grid_num = 0
-        for item_field in vars(item):
-            if item_field in ["name", "_player"]:
-                continue
+        for item_field in fields:
             stat_value = getattr(item, item_field)
             stat_label = stat_layout_style(clean_field_name(item_field))
             layout.addWidget(stat_label, grid_num, 0)
 
             value_label = stat_layout_style(stat_value)
             layout.addWidget(value_label, grid_num, 2)
-            layout.setRowStretch(grid_num, 2 + math.ceil(math.log(len(stat_value))))
+            layout.setRowStretch(grid_num, 2 + math.ceil(math.log(len(str(stat_value)))))
             grid_num += 1
 
         item_tab.setLayout(layout)
         return item_tab
 
-    def _add_create_item(self):
-        button = button_manage_item_style(QPushButton('Create New item'))
-        button.clicked.connect(self.open_item_creation)
-        button.show()
-        self.addWidget(button, 1, 0, 1, 1)
-
-    def _add_edit_item(self):
-        button = button_manage_item_style(QPushButton('Edit item'))
-        button.clicked.connect(self.edit_item)
-        button.show()
-        self.addWidget(button, 2, 0, 1, 1)
-
-    def _add_delete_item(self):
-        button = button_manage_item_style(QPushButton('Delete item'))
-        button.clicked.connect(self.delete_item)
-        button.show()
-        self.addWidget(button, 3, 0, 1, 1)
-
     def delete_item(self):
-        del self.data_store.items[self.tabwidget.currentIndex()]
+        del self.items[self.tabwidget.currentIndex()]
         self._update_item_tabs()
+
+    def import_item(self):
+        popup = ItemImportPopup(self)
+        popup.show()
+        popup.exec()
 
     def edit_item(self):
         index = self.tabwidget.currentIndex()
-        item = self.data_store.items[index]
+        item = self.items[index]
         popup = EditItemPopup(self, item, index)
         popup.show()
         popup.exec()
@@ -91,15 +79,12 @@ class ItemLayout(QGridLayout):
         popup.exec()
 
     def add_item(self, item):
-        self.data_store.items.append(item)
+        self.items.append(item)
         self._update_item_tabs()
 
     def _update_item_tabs(self):
         self.tabwidget.close()
         self.tabwidget = self.create_item_tabs()
-
-    def save_items(self):
-        save_items(self.data_store.items)
 
 
 class ItemCreationPopup(Popup):
@@ -128,6 +113,46 @@ class ItemCreationPopup(Popup):
         self.form_group_box.setLayout(layout)
 
 
+class ItemImportPopup(Popup):
+    def __init__(self, parent):
+        """
+        Args:
+            parent (itemLayout):
+        """
+        self.item_line_edit = None
+        self.item_names = get_item_names()
+        super().__init__("Import Item", parent)
+
+    def get_info(self):
+        if self.item_line_edit.text() in self.item_names:
+            item_id = self.item_names[self.item_line_edit.text()]
+            if len([item for item in self.item_names.values() if item == item_id]) > 1:
+                response = request_item_data(int(item_id), self.item_line_edit.text())
+            else:
+                response = request_item_data(int(item_id))
+            item = Item(**response)
+            self.parent.add_item(item)
+        self.close()
+
+    def _get_item_values(self):
+        return [item.text() for item in self.item_line_edits.values()]
+
+    def create_form(self):
+        model = QStringListModel()
+        model.setStringList(self.item_names)
+
+        completer = QCompleter()
+        completer.setModel(model)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+
+        self.item_line_edit = QLineEdit()
+        self.item_line_edit.setCompleter(completer)
+        self.item_line_edit.show()
+        layout = QFormLayout()
+        layout.addRow(self.item_line_edit)
+        self.form_group_box.setLayout(layout)
+
+
 class EditItemPopup(ItemCreationPopup):
     def __init__(self, parent, item, index):
         super().__init__(parent)
@@ -139,29 +164,6 @@ class EditItemPopup(ItemCreationPopup):
     def get_info(self):
         self.parent.items[self.index] = Item(*self._get_item_values())
         self.close()
-
-
-def stat_layout_style(value):
-    label = QLabel(str(value))
-    label.setFont(QFont('Arial', 13))
-    label.setAlignment(Qt.AlignTop)
-    label.setWordWrap(True)
-    label.show()
-    return label
-
-
-def stat_header_style(value):
-    label = QLabel(str(value))
-    header_font = QFont('Arial', 16)
-    header_font.setBold(True)
-    label.setFont(header_font)
-    label.show()
-    return label
-
-
-def button_manage_item_style(button):
-    button.setMinimumWidth(150)
-    return button
 
 
 def clean_field_name(value):
