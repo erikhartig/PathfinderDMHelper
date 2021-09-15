@@ -51,6 +51,7 @@ class GMInfoLayout(QGridLayout):
                 side_grid += 2
             gp_count = stat_layout_style(str(total_gp))
             layout.addWidget(gp_count, grid_num, side_grid, alignment=Qt.AlignCenter)
+            grid_num += 1
         item_overview.setLayout(layout)
         return item_overview
 

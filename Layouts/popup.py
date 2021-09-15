@@ -4,16 +4,13 @@ from PyQt5.QtWidgets import QVBoxLayout, QDialogButtonBox, QLineEdit, QGroupBox,
 
 
 class Popup(QDialog):
-    def __init__(self, name, parent):
+    def __init__(self, name):
         """
-        Args:
-            parent (itemLayout):
         """
         super().__init__()
         self.setWindowTitle(name)
         self.setGeometry(100, 100, 300, 400)
         self.form_group_box = QGroupBox("")
-        self.parent = parent
 
         # calling the method that create the form
         self.create_form()

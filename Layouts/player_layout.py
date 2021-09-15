@@ -3,10 +3,10 @@ from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QLabel, QFormLayout, QLineEdit, \
     QGridLayout, QTabWidget, QWidget, QListWidget
 
-from Core.player import Player, AbilityScores, Skills, SkillScore, get_all_players
+from Core.player import Player, SkillScore, get_all_players, get_all_items, get_ability_fields, get_skill_fields
 from CustomObjects.lines import VLine
 from Layouts.edit_grid_layout import stat_header_style, stat_layout_style, EditGridLayout
-from Layouts.popup import Popup, get_field_names, create_qlines
+from Layouts.popup import Popup, create_qlines
 
 
 class PlayerLayout(EditGridLayout):
@@ -45,9 +45,9 @@ class PlayerLayout(EditGridLayout):
         stats_tab = QWidget()
         layout = QGridLayout()
 
-        list_player_data(layout, player.ability_scores, "Ability Scores", 0)
-        layout.addWidget(VLine(color=QColor("White")), 1, 2, len(vars(player.skills)), 1)
-        list_player_data(layout, player.skills, "Skills", 3)
+        list_player_data(layout, player.get_ability_scores(), "Ability Scores", 0)
+        layout.addWidget(VLine(color=QColor("White")), 1, 2, len(player.get_skill_scores().keys()), 1)
+        list_player_data(layout, player.get_skill_scores(), "Skills", 3)
 
         stats_tab.setLayout(layout)
         return stats_tab
@@ -74,7 +74,7 @@ class PlayerLayout(EditGridLayout):
     def add_item(self):
         index = self.tabwidget.currentIndex()
         player = self.players[index]
-        popup = AddItemPopup(self, player, self.data_store.items)
+        popup = AddItemPopup(player)
         popup.show()
         popup.exec()
         self._update_player_tabs()
@@ -82,27 +82,30 @@ class PlayerLayout(EditGridLayout):
     def remove_item(self):
         index = self.tabwidget.currentIndex()
         player = self.players[index]
-        popup = RemoveItemPopup(self, player, player.items)
+        popup = RemoveItemPopup(player, player.items)
         popup.show()
         popup.exec()
         self._update_player_tabs()
 
     def delete_player(self):
+        player = self.players[self.tabwidget.currentIndex()]
+        player.delete()
         del self.players[self.tabwidget.currentIndex()]
         self._update_player_tabs()
 
     def edit_player(self):
         index = self.tabwidget.currentIndex()
         player = self.players[index]
-        popup = EditPlayerPopup(self, player, index)
+        popup = EditPlayerPopup(player, index)
         popup.show()
         popup.exec()
         self._update_player_tabs()
 
     def open_player_creation(self):
-        popup = PlayerCreationPopup(self)
+        popup = PlayerCreationPopup()
         popup.show()
         popup.exec()
+        self._update_player_tabs()
 
     def add_player(self, player):
         self.players.append(player)
@@ -115,31 +118,28 @@ class PlayerLayout(EditGridLayout):
 
 
 class PlayerCreationPopup(Popup):
-    def __init__(self, parent):
+    def __init__(self):
         """
-        Args:
-            parent (PlayerLayout):
         """
         self.name_line_edit = QLineEdit()
-        self.abilities = self._ability_fields()
+        self.abilities = get_ability_fields()
         self.ability_line_edits = create_qlines(self.abilities)
 
-        self.skills = self._skill_fields()
+        self.skills = get_skill_fields()
         self.skill_line_edits = create_qlines(self.skills)
-        super().__init__("Create Player", parent)
+        super().__init__("Create Player")
 
     def get_info(self):
-        player = Player(self.name_line_edit.text(), self._get_ability_scores(), self._get_skills())
-        self.parent.add_player(player)
+        Player(self.name_line_edit.text(), *self._get_skills(), *self._get_ability_scores())
         self.close()
 
     def _get_ability_scores(self):
         values = [int(ability.text()) for ability in self.ability_line_edits.values() if ability.text()]
-        return AbilityScores(*values)
+        return values
 
     def _get_skills(self):
         values = [SkillScore(int(ability.text())) for ability in self.skill_line_edits.values() if ability.text()]
-        return Skills(*values)
+        return values
 
     def create_form(self):
         layout = QFormLayout()
@@ -150,75 +150,65 @@ class PlayerCreationPopup(Popup):
             layout.addRow(QLabel(field.capitalize()), self.skill_line_edits[field])
         self.form_group_box.setLayout(layout)
 
-    @staticmethod
-    def _ability_fields():
-        fields = get_field_names(AbilityScores)
-        return [field for field in fields if field.lower() not in ["player_id", "id"]]
-
-    @staticmethod
-    def _skill_fields():
-        fields = get_field_names(Skills)
-        return [field for field in fields if field.lower() not in ["player_id", "id"]]
-
 
 class EditPlayerPopup(PlayerCreationPopup):
-    def __init__(self, parent, player, index):
-        super().__init__(parent)
+    def __init__(self, player, index):
+        super().__init__()
         self.player = player
         self.index = index
         self.name_line_edit.setText(player.name)
         for name, line_edit in self.ability_line_edits.items():
-            line_edit.setText(str(getattr(player.ability_scores, name)))
+            line_edit.setText(str(getattr(player, name)))
         for name, line_edit in self.skill_line_edits.items():
-            line_edit.setText(str(getattr(player.skills, name)))
+            line_edit.setText(str(getattr(player, name)))
 
     def get_info(self):
-        self.parent.players[self.index].ability_scores = self._get_ability_scores()
+        self.player.name = self.name_line_edit.text()
+        for name, line_edit in self.ability_line_edits.items():
+            setattr(self.player, name, line_edit.text())
+        for name, line_edit in self.skill_line_edits.items():
+            setattr(self.player, name, line_edit.text())
+        self.player.save()
         self.close()
 
 
 class AddItemPopup(Popup):
-    def __init__(self, parent, player, items):
+    def __init__(self, player):
         """
-        Args:
-            parent (PlayerLayout):
         """
         self.player = player
-        self.items = items
-        super().__init__("Add Item", parent)
+        super().__init__("Add Item")
         self.selected_item = None
 
     def get_info(self):
         if self.selected_item:
-            self.player.assign_item(self.selected_item)
+            self.player.add_item(self.selected_item)
         self.close()
 
     def create_form(self):
         layout = QGridLayout()
         list_widget = QListWidget()
         list_widget.itemClicked.connect(self.add_item)
-        for item in self.items:
+        for item in get_all_items():
             if not item.player:
                 list_widget.addItem(item.name)
         layout.addWidget(list_widget, 0, 0)
         self.form_group_box.setLayout(layout)
 
     def add_item(self, item_selected):
-        for item in self.items:
+        for item in get_all_items():
             if item.name == item_selected.text():
                 self.selected_item = item
                 return
 
 
 class RemoveItemPopup(Popup):
-    def __init__(self, parent, player, items):
+    def __init__(self, player, items):
         """
-        Args:
-            parent (PlayerLayout):
         """
         self.player = player
         self.items = items
-        super().__init__("Remove Item", parent)
+        super().__init__("Remove Item")
         self.selected_item = None
 
     def get_info(self):
@@ -242,11 +232,11 @@ class RemoveItemPopup(Popup):
                 return
 
 
-def list_player_data(layout, data_class, name, start_position):
+def list_player_data(layout, data, name, start_position):
     data_title = stat_header_style(name)
     layout.addWidget(data_title, 0, start_position)
     grid_num = 1
-    for data_name, data_value in data_class.get_all().items():
+    for data_name, data_value in data.items():
         data_label = stat_layout_style(data_name.capitalize())
         layout.addWidget(data_label, grid_num, start_position)
         value_label = stat_layout_style(data_value)

@@ -128,7 +128,7 @@ class ItemParser(HTMLParser):
 
     @staticmethod
     def _started(attrs):
-        if ('id', 'ctl00_MainContent_DetailedOutput') in attrs:
+        if ('id', 'ctl00_RadDrawer1_Content_MainContent_DetailedOutput') in attrs:
             return True
         return False
 

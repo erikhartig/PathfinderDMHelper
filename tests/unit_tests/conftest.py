@@ -8,6 +8,10 @@ from Core import player
 from Core.player import set_engine
 
 
+# from Core import misc
+# from Core.misc import set_engine
+
+
 @pytest.fixture()
 def session():
     if os.path.exists("test.db"):

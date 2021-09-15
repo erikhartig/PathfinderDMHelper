@@ -1,4 +1,4 @@
-from Core.player import Item, Player, get_all_items
+from Core.player import Item, get_all_items
 from tests.unit_tests.test_player import create_player
 
 
@@ -56,8 +56,7 @@ def test_get_player_assigned_to_item(session):
     player = create_player()
     item = create_sample_item()
     player.add_item(item)
-    with session.begin() as db:
-        assert db.get(Player, item.player_id) == player
+    assert item.player == player
 
 
 def test_remove_item_from_player(session):
@@ -96,3 +95,10 @@ def test_get_all_items(session):
     assert item_1 in items
     assert item_2 in items
     assert items == [item_1, item_2]
+
+
+def test_get_item_fields(session):
+    item = create_sample_item()
+    item_fields = item.get_fields()
+    assert set(item_fields.keys()) == \
+           {"name", "description", "activate", "frequency", "effect", "item_level", "gp_cost"}

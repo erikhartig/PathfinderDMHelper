@@ -4,11 +4,11 @@ from PyQt5.QtCore import Qt, QStringListModel
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QLabel, QFormLayout, QGridLayout, QTabWidget, QWidget, QCompleter, QLineEdit
 
-from Core.player import Item, get_all_items
+from Core.player import Item, get_all_items, get_item_fields
 from Core.scrape import get_item_names, request_item_data
 from CustomObjects.lines import VLine
 from Layouts.edit_grid_layout import stat_layout_style, EditGridLayout
-from Layouts.popup import Popup, get_field_names, create_qlines
+from Layouts.popup import Popup, create_qlines
 
 
 class ItemLayout(EditGridLayout):
@@ -40,43 +40,46 @@ class ItemLayout(EditGridLayout):
         layout = QGridLayout()
         layout.setVerticalSpacing(10)
         layout.setColumnStretch(2, 4)
-        fields = [field for field in vars(item) if getattr(item, field) and field not in ["name", "_player"]]
+        fields = item.get_fields()
         layout.addWidget(VLine(color=QColor("White")), 0, 1, len(fields), 1)
         grid_num = 0
-        for item_field in fields:
-            stat_value = getattr(item, item_field)
+        for item_field, value in fields.items():
             stat_label = stat_layout_style(clean_field_name(item_field))
             layout.addWidget(stat_label, grid_num, 0)
 
-            value_label = stat_layout_style(stat_value)
+            value_label = stat_layout_style(value)
             layout.addWidget(value_label, grid_num, 2)
-            layout.setRowStretch(grid_num, 2 + math.ceil(math.log(len(str(stat_value)))))
+            layout.setRowStretch(grid_num, 2 + math.ceil(math.log(len(str(value)))))
             grid_num += 1
 
         item_tab.setLayout(layout)
         return item_tab
 
     def delete_item(self):
+        item = self.items[self.tabwidget.currentIndex()]
+        item.delete()
         del self.items[self.tabwidget.currentIndex()]
         self._update_item_tabs()
 
     def import_item(self):
-        popup = ItemImportPopup(self)
+        popup = ItemImportPopup()
         popup.show()
         popup.exec()
+        self._update_item_tabs()
 
     def edit_item(self):
         index = self.tabwidget.currentIndex()
         item = self.items[index]
-        popup = EditItemPopup(self, item, index)
+        popup = EditItemPopup(item, index)
         popup.show()
         popup.exec()
         self._update_item_tabs()
 
     def open_item_creation(self):
-        popup = ItemCreationPopup(self)
+        popup = ItemCreationPopup()
         popup.show()
         popup.exec()
+        self._update_item_tabs()
 
     def add_item(self, item):
         self.items.append(item)
@@ -84,23 +87,20 @@ class ItemLayout(EditGridLayout):
 
     def _update_item_tabs(self):
         self.tabwidget.close()
+        self.items = get_all_items()
         self.tabwidget = self.create_item_tabs()
 
 
 class ItemCreationPopup(Popup):
-    def __init__(self, parent):
+    def __init__(self):
         """
-        Args:
-            parent (itemLayout):
         """
-        self.item_fields = get_field_names(Item)
-        self.item_fields.remove("_player")
+        self.item_fields = get_item_fields()
         self.item_line_edits = create_qlines(self.item_fields)
-        super().__init__("Create Item", parent)
+        super().__init__("Create Item")
 
     def get_info(self):
-        item = Item(*self._get_item_values())
-        self.parent.add_item(item)
+        Item(*self._get_item_values())
         self.close()
 
     def _get_item_values(self):
@@ -114,14 +114,12 @@ class ItemCreationPopup(Popup):
 
 
 class ItemImportPopup(Popup):
-    def __init__(self, parent):
+    def __init__(self):
         """
-        Args:
-            parent (itemLayout):
         """
         self.item_line_edit = None
         self.item_names = get_item_names()
-        super().__init__("Import Item", parent)
+        super().__init__("Import Item")
 
     def get_info(self):
         if self.item_line_edit.text() in self.item_names:
@@ -130,8 +128,7 @@ class ItemImportPopup(Popup):
                 response = request_item_data(int(item_id), self.item_line_edit.text())
             else:
                 response = request_item_data(int(item_id))
-            item = Item(**response)
-            self.parent.add_item(item)
+            Item(**response)
         self.close()
 
     def _get_item_values(self):
@@ -154,15 +151,17 @@ class ItemImportPopup(Popup):
 
 
 class EditItemPopup(ItemCreationPopup):
-    def __init__(self, parent, item, index):
-        super().__init__(parent)
+    def __init__(self, item, index):
+        super().__init__()
         self.item = item
         self.index = index
         for name, line_edit in self.item_line_edits.items():
             line_edit.setText(str(getattr(item, name)))
 
     def get_info(self):
-        self.parent.items[self.index] = Item(*self._get_item_values())
+        for name, line_edit in self.item_line_edits.items():
+            line_edit.setText(str(getattr(self.item, name)))
+        self.item.save()
         self.close()
 
 
