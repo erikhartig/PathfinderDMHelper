@@ -5,8 +5,9 @@ from PyQt5.QtWidgets import QLabel, QFormLayout, QLineEdit, \
 
 from Core.player import Player, SkillScore, get_all_players, get_all_items, get_ability_fields, get_skill_fields
 from CustomObjects.lines import VLine
-from Layouts.edit_grid_layout import stat_header_style, stat_layout_style, EditGridLayout
+from Layouts.edit_grid_layout import EditGridLayout
 from Layouts.popup import Popup, create_qlines
+from Style.label_style import stat_header_style, stat_layout_style
 
 
 class PlayerLayout(EditGridLayout):

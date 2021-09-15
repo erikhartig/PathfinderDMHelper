@@ -70,8 +70,3 @@ class DiceLayout(QVBoxLayout):
             self.dice_result.close()
             self.update()
             self.dice_result = new_result
-
-
-def button_dice_style(button):
-    button.setMinimumWidth(80)
-    return button

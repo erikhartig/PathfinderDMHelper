@@ -1,9 +1,11 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QColor
-from PyQt5.QtWidgets import QLabel, QGridLayout, QWidget, QTabWidget, QPushButton
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QGridLayout, QWidget, QTabWidget, QPushButton
 
 from Core.player import get_all_players
 from CustomObjects.lines import VLine, HLine
+from Style.button_styles import button_manage_refresh_style
+from Style.label_style import stat_layout_style, stat_header_style
 
 
 class GMInfoLayout(QGridLayout):
@@ -60,35 +62,6 @@ class GMInfoLayout(QGridLayout):
         self.tabwidget = self.create_item_overview_tabs()
 
 
-def stat_layout_style(value):
-    label = QLabel(str(value))
-    label.setFont(QFont('Arial', 13))
-    label.setAlignment(Qt.AlignTop)
-    label.setWordWrap(True)
-    label.show()
-    return label
-
-
-def stat_header_style(value):
-    label = QLabel(str(value))
-    header_font = QFont('Arial', 16)
-    header_font.setBold(True)
-    label.setFont(header_font)
-    label.show()
-    return label
-
-
-def button_manage_item_style(button):
-    button.setMinimumWidth(150)
-    return button
-
-
 def clean_field_name(value):
     value = value.replace("_", " ")
     return value.title()
-
-
-def button_manage_refresh_style(button):
-    button.setMinimumWidth(150)
-    button.setMaximumWidth(200)
-    return button

@@ -7,8 +7,9 @@ from PyQt5.QtWidgets import QLabel, QFormLayout, QGridLayout, QTabWidget, QWidge
 from Core.player import Item, get_all_items, get_item_fields
 from Core.scrape import get_item_names, request_item_data
 from CustomObjects.lines import VLine
-from Layouts.edit_grid_layout import stat_layout_style, EditGridLayout
+from Layouts.edit_grid_layout import EditGridLayout
 from Layouts.popup import Popup, create_qlines
+from Style.label_style import stat_layout_style
 
 
 class ItemLayout(EditGridLayout):
