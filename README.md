@@ -6,8 +6,15 @@ I often found while running Pathfinder (or really any meaty tabletop rpg) that t
 - npc name list
 
 ### Magic Item Tracker
-- Can add custom items
-- Can import items from the Pathfinder 2e psfrd
-- Can assign and remove items to players
-- Can view all items assigned to a player
-- Can see an item overview for all players
+- Can add custom items ✅
+- Can import items from the Pathfinder 2e psfrd ✅
+- Can assign and remove items to players ✅
+- Can view all items assigned to a player ✅
+- Can see an item overview for all players ✅
+
+### Secret roll manager
+- Players have stats associated with them ✅
+- Implement a basic dice system ✅
+- Roll stat for specific player
+- Save rolls for a player
+- Roll for multiple players at once
